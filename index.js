@@ -38,11 +38,15 @@ function ConfigFile (configPath) {
                 : 'HOME'
             ];
         configPath = Path.join(homePath, '.webtask');
+        configPathLocalSettings = Path.join(homePath, '.webtask.settings');
     }
     
     this.configPath = configPath;
+    this.configPathLocalSettings = configPathLocalSettings;
     this.profiles = {};
+    this.defaultProfile = {};
     this.loaded = null;
+    this.loadedSettings = null;
 }
 
 ConfigFile.prototype.load = function (cb) {
@@ -62,6 +66,27 @@ ConfigFile.prototype.load = function (cb) {
     return cb ? this.loaded.nodeify(cb) : this.loaded;
 };
 
+ConfigFile.prototype.loadLocalSettings = function (cb) {
+    var self = this;
+    var readFile = Bluebird.promisify(Fs.readFile, Fs);
+
+    if (!this.loadedSettings) {
+        this.loadedSettings = readFile(this.configPathLocalSettings, 'utf8')
+            .catch(function (e) {
+                if (e.code === 'ENOENT') return '{}';
+                else throw e;
+            })
+            .then(JSON.parse)
+            .then(function (defaultProfile) {
+                self.defaultProfile.name = defaultProfile.name;
+
+                return self.defaultProfile.name;
+            });
+    }
+
+    return cb ? this.loadedSettings.nodeify(cb) : this.loadedSettings;
+};
+
 ConfigFile.prototype.save = function (cb) {
     var writeFile = Bluebird.promisify(Fs.writeFile, Fs);
     var profileData = JSON.stringify(this.profiles, null, 2);
@@ -71,11 +96,21 @@ ConfigFile.prototype.save = function (cb) {
     return cb ? promise.nodeify(cb) : promise;
 };
 
+ConfigFile.prototype.saveLocalSettings = function (profileName, cb) {
+    var localSettingsData = JSON.stringify({'name': profileName}, null, 2);
+    var promise$ = Fs.writeFileAsync(this.configPathLocalSettings, localSettingsData, 'utf8') 
+
+    return cb ? promise$.nodeify(cb) : promise$;
+};
+
 ConfigFile.prototype.getProfile = function (profileName, cb) {
-    if (!profileName) profileName = 'default';
-    
+    var self = this;
+    var profileNameScoped = profileName;
     var promise = this.load()
-        .get(profileName)
+        .then(this.loadLocalSettings, function(){
+            if(!profileName) profileNameScoped = self.defaultProfile.name || 'default'
+        })
+        .get(profileNameScoped)
         .then(function (profile) {
             if (!profile) 
                 throw new Boom.notFound('Profile `' + profileName

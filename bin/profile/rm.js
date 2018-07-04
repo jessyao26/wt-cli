@@ -17,7 +17,6 @@ module.exports = Cli.createCommand('rm', {
         'profile': {
             description: 'Profile to remove',
             type: 'string',
-            defaultValue: 'default',
         },
     },
     handler: handleProfileRemove,
