@@ -104,30 +104,44 @@ ConfigFile.prototype.saveLocalSettings = function (profileName, cb) {
 };
 
 ConfigFile.prototype.getProfile = function (profileName, cb) {
-    var defaultProfileNameScoped = profileName;
+    var self = this;
 
-    this.loadLocalSettings().then(function (data){
-        if(!profileName) defaultProfileNameScoped = data || 'default';
-    });
-    var promise = this.load()
-        .get(defaultProfileNameScoped)
-        .then(function (profile) {
-            if (!profile) 
-                throw new Boom.notFound('Profile `' + profileName
-                    + '` not found.');
-            
-            return new WebtaskProfile(profile);
-        });
+    var promise = new Promise((resolve) => {
+        self.load()
+        .then(function (profiles) {
+            self.loadLocalSettings().then(function(data){
+                if (!profileName) {
+                    profileName = Object.keys(profiles).length === 1
+                        ?   Object.keys(profiles)[0]
+                        : data ||  'default';
+                }
+                
+                var profile = profiles[profileName];
+                if (!profile)
+                    throw new Cli.error.notFound('Profile `' + profileName
+                        + '` not found');
     
+                resolve(profile);
+            })
+        })
+    });
+
     return cb ? promise.nodeify(cb) : promise;
 };
 
 ConfigFile.prototype.setProfile = function (profileName, profileData, cb) {
-    var promise = this.load()
-        .then(function (profiles) {
-            return (profiles[profileName] = profileData);
-        });
-    
+    var self = this;
+
+    var promise = new Promise((resolve) => {
+        self.load()
+        .then(function (profiles){
+            self.loadLocalSettings().then(function(data){
+                if(!profileName) profileName = data || 'default';
+            })
+            resolve(profiles[profileName] = profileData);
+        })
+    })
+
     return cb ? promise.nodeify(cb) : promise;
 };
 
