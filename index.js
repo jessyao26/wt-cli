@@ -104,13 +104,13 @@ ConfigFile.prototype.saveLocalSettings = function (profileName, cb) {
 };
 
 ConfigFile.prototype.getProfile = function (profileName, cb) {
-    var self = this;
-    var profileNameScoped = profileName;
+    var defaultProfileNameScoped = profileName;
+
+    this.loadLocalSettings().then(function (data){
+        if(!profileName) defaultProfileNameScoped = data || 'default';
+    });
     var promise = this.load()
-        .then(this.loadLocalSettings, function(){
-            if(!profileName) profileNameScoped = self.defaultProfile.name || 'default'
-        })
-        .get(profileNameScoped)
+        .get(defaultProfileNameScoped)
         .then(function (profile) {
             if (!profile) 
                 throw new Boom.notFound('Profile `' + profileName
